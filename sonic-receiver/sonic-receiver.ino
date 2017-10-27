@@ -27,21 +27,13 @@ For more information, please refer to <https://unlicense.org>
 
 */
 
-#include <Wire.h>
-#include "Ultrasonic.h"
-Ultrasonic ultrasonic(2); // Pins 2-3
-const int outputPin = 5;
+int inputPin = A5;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(outputPin, OUTPUT);
+  pinMode(inputPin, INPUT);
 }
 
 void loop() {
-    int dist = getDist();
-    /*
-    * Transmit the signal over the wire.
-    */
-    analogWrite(outputPin, 200);
-    Serial.println(dist, DEC);
+	Serial.println(analogRead(inputPin) / 4, DEC);
 }

@@ -32,7 +32,7 @@ For more information, please refer to <https://unlicense.org>
 #include <SoftwareSerial.h>
 #include "Ultrasonic.h"
 
-const int conveyorLengthCm = 110;
+const int conveyorLengthCm = 90;
 const int conveyorStep = 5; // Distance to move at a time
 Ultrasonic ultrasonic(2); // Pins 2-3
 SerialLCD lcd(4, 5);
@@ -53,7 +53,7 @@ unsigned long units[] = {
 
 unsigned long lastMove = 0;
 int unit = 0;
-int duration = 30;
+int duration = 1;
 
 void setup() {
   Serial.begin(9600);
@@ -63,6 +63,7 @@ void setup() {
   pinMode(relayPin, OUTPUT);
   lcd.begin();
   lcd.backlight();
+  Serial.println("Finished setup");
 }
 
 void loop() {
@@ -76,12 +77,8 @@ void loop() {
     unit++;
   }
 
-  Serial.println(duration, DEC);
-
-  drawLcd();
-
   // Ensure bounds
-  duration = max(0, duration);
+  duration = max(1, duration);
   duration = min(60, duration);
   if(unit > 4) {
     unit = 0;
@@ -89,7 +86,10 @@ void loop() {
     unit = 4;
   }
 
-  if (getDist() > conveyorLengthCm + 5) return; // Nothing on conveyor
+  statusPrint();
+  drawLcd();
+
+  if (getDist() > conveyorLengthCm) return; // Nothing on conveyor
 
   if (millis() > nextMoveTime()){
     move5cm();
@@ -99,32 +99,69 @@ void loop() {
 void move5cm() {
   lastMove = millis();
   int startDist = getDist();
-  while(getDist() - startDist < 5) {
+  Serial.println("BEGAN MOVEMENT");
+  int dist = getDist();
+  while(dist - startDist < 5) {
     digitalWrite(relayPin, HIGH);
+    dist = getDist();
+    if (dist > conveyorLengthCm - 5) {
+      Serial.print("Object seems to be falling off. Dist: ");
+      Serial.print(dist, DEC);
+      Serial.println();
+      delay(2000);
+      break;
+    }
+
+    Serial.print(dist - startDist, DEC);
+    Serial.print("-");
+    Serial.print(dist, DEC);
+    Serial.println();
+    
     delay(10);
   }
+  Serial.println("ENDED MOVEMENT");
   digitalWrite(relayPin, LOW);
 }
 
-int nextMoveTime() {
+long nextMoveTime() {
     int steps = conveyorLengthCm / conveyorStep;
-    return lastMove + (units[unit] * duration) * steps;
+
+    return lastMove + (units[unit] * duration) / steps;
 }
 
 int lastButtonTimes[] = {0, 0, 0};
 int threshold = 500;
 
 bool checkButton(int btn) {
-    if (digitalRead(buttons[btn]) == HIGH
-            && millis() - lastButtonTimes[btn] > threshold) {
-        lastButtonTimes[btn] = millis();
-        return true;
-    }
-    return false;
+  if (digitalRead(buttons[btn]) == HIGH
+      && millis() - lastButtonTimes[btn] > threshold) {
+    lastButtonTimes[btn] = millis();
+    return true;
+  }
+  return false;
 }
+
+/*
+ * If called too frequently the Ultrasonic class will return 0. 
+ */
+int getDist() {
+  return (getDist0() + getDist0()) / 2;
+}
+
+int getDist0() {
+  while (true) {
+    int dist = ultrasonic.MeasureInCentimeters();
+    if (dist != 0 && dist < 100) {
+      return dist;
+    }
+  }
+}
+
+/* Feedback */
 
 void drawLcd() {
   lcd.clear();
+  lcd.setCursor(1,1);
   lcd.print(duration, DEC);
   lcd.print(" ");
 
@@ -142,19 +179,20 @@ void drawLcd() {
   }
 }
 
-/*
- * If called too frequently the Ultrasonic class will return 0. 
- */
-int getDist() {
-  return (getDist0() + getDist0()) / 2;
-}
+long lastPrint = 0;
 
-int getDist0() {
-  while (true) {
-    int dist = ultrasonic.MeasureInCentimeters();
-    if (dist != 0 && dist < 100) {
-      return dist;
-    }
-  }
+void statusPrint() {
+  if (lastPrint - millis() < 1000) return;
+
+  lastPrint = millis();
+
+  Serial.print("Next move will be in ");
+  Serial.print(nextMoveTime() - millis(), DEC);
+  Serial.print("ms, last move: ");
+  Serial.print(lastMove, DEC);
+  Serial.print("ms, dist: ");
+  Serial.print(getDist(), DEC);
+  Serial.println();
+  
 }
 
