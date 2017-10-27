@@ -39,6 +39,11 @@ void setup() {
 
 void loop() {
     int dist = getDist();
+    /*
+    * Transmit the signal over the wire.
+    * The signal is amplified by 10 to result in a higher voltage-to-distance ratio.
+    * Because the signal is amplified, it is likely less prone to errors. 
+    */
     analogWrite(outputPin, dist * 10);
     Serial.println(dist, DEC);
 }
@@ -57,3 +62,4 @@ int getDist0() {
     }
   }
 }
+
