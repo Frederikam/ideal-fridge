@@ -32,7 +32,7 @@ For more information, please refer to <https://unlicense.org>
 #include <SoftwareSerial.h>
 #include "Ultrasonic.h"
 
-const int conveyorLengthCm = 90;
+const int conveyorLengthCm = 80;
 const int conveyorStep = 5; // Distance to move at a time
 Ultrasonic ultrasonic(2); // Pins 2-3
 SerialLCD lcd(4, 5);
@@ -47,8 +47,8 @@ unsigned long units[] = {
     60000,         // Minute
     3600000,       // Hour
     86400000,      // Day
-    604800000,     // Week
-    2592000000,    // Month (approx)
+//    604800000,     // Week
+//  2592000000,    // Month (approx)
 };
 
 unsigned long lastMove = 0;
@@ -80,7 +80,7 @@ void loop() {
   // Ensure bounds
   duration = max(1, duration);
   duration = min(60, duration);
-  if(unit > 4) {
+  if(unit > 2) {
     unit = 0;
   } else if (unit < 0) {
     unit = 4;
@@ -101,14 +101,19 @@ void move5cm() {
   int startDist = getDist();
   Serial.println("BEGAN MOVEMENT");
   int dist = getDist();
-  while(dist - startDist < 5) {
+  while(dist - startDist < conveyorStep - 1) {
     digitalWrite(relayPin, HIGH);
     dist = getDist();
-    if (dist > conveyorLengthCm - 5) {
+    if (dist > conveyorLengthCm - 7) {
+      if (conveyorLengthCm - dist < 0) return;
+      digitalWrite(relayPin, LOW);
+      Serial.println("Nearly falling off. Waiting final part...");
+      delay((stepDuration() / conveyorStep) * (conveyorLengthCm - dist));
+      digitalWrite(relayPin, HIGH);
       Serial.print("Object seems to be falling off. Dist: ");
       Serial.print(dist, DEC);
       Serial.println();
-      delay(2000);
+      delay(4000);
       break;
     }
 
@@ -123,10 +128,14 @@ void move5cm() {
   digitalWrite(relayPin, LOW);
 }
 
-long nextMoveTime() {
+long stepDuration() {
     int steps = conveyorLengthCm / conveyorStep;
 
-    return lastMove + (units[unit] * duration) / steps;
+    return (units[unit] * duration) / steps;
+}
+
+long nextMoveTime() {
+    return lastMove + stepDuration();
 }
 
 int lastButtonTimes[] = {0, 0, 0};
